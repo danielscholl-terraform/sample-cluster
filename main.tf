@@ -367,20 +367,39 @@ module "keyvault_secret" {
 #-------------------------------
 # Virtual Machine
 #-------------------------------
-data "local_file" "cloudinit" {
-  filename = "${path.module}/setup.conf"
-}
+# data "local_file" "cloudinit" {
+#   filename = "${path.module}/setup.conf"
+# }
+
+# data "template_file" "user_data" {
+#   template = file("../scripts/add-ssh-web-app.yaml")
+# }
 
 # data "template_cloudinit_config" "config" {
-#   gzip          = true
+#   gzip = true
 #   base64_encode = true
 
-#   # Main cloud-config configuration file.
 #   part {
+#     filename = "setup.conf"
 #     content_type = "text/cloud-config"
-#     content      = "packages: ['httpie']"
+#     content = "${data.template_file.cloud_config.rendered}"
 #   }
 # }
+
+data "template_file" "cloudconfig" {
+  template = file("${path.module}/setup.conf")
+}
+
+data "template_cloudinit_config" "config" {
+  gzip          = true
+  base64_encode = true
+
+  part {
+    content_type = "text/cloud-config"
+    content      = data.template_file.cloudconfig.rendered
+  }
+}
+
 
 module "linux_server" {
   source     = "git::https://github.com/danielscholl-terraform/module-virtual-machine?ref=main"
@@ -396,7 +415,7 @@ module "linux_server" {
   vnet_subnet_id = module.network.subnets["iaas-private"].id
   ssh_key        = "${trimspace(tls_private_key.key.public_key_openssh)} ${var.admin_username}"
 
-  custom_script = base64encode(data.local_file.cloudinit.content)
+  custom_script = data.template_cloudinit_config.config.rendered
 }
 
 
