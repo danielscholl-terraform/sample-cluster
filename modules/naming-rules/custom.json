@@ -1,0 +1,71 @@
+{
+  "environment": {
+    "category": "Custom",
+    "entity": "environment",
+    "scope": "global",
+    "maxlength": "7",
+    "rule": "az",
+    "allowed_values": {
+      "cicd": "Pipelines",
+      "sandbox": "Sandbox",
+      "dev": "Development",
+      "test": "Testing",
+      "prod": "Production"
+    }
+  },
+  "product": {
+    "category": "Custom",
+    "entity": "product",
+    "scope": "global",
+    "maxlength": "12",
+    "rule": "az",
+    "allowed_values": {
+      "iac": "Infrastructure as Code",
+      "aks": "AKS Cluster"
+    }
+  },
+  "azureRegion": {
+    "category": "Custom",
+    "entity": "azureRegion",
+    "scope": "global",
+    "maxlength": "20",
+    "rule": "az",
+    "allowed_values": {
+      "centralus": "Central US",
+      "eastus": "East US",
+      "eastus2": "East US 2",
+      "westus2": "West US 2",
+      "northcentralus": "North Central US",
+      "southcentralus": "South Central US",
+      "northeurope": "North Europe",
+      "westeurope": "West Europe"
+    }
+  },
+  "subnetType": {
+    "category": "Custom",
+    "entity": "subnetType",
+    "scope": "global",
+    "maxlength": "24",
+    "rule": "A-Z",
+    "allowed_values": {
+      "azure-appgateway": "Application Gateway",
+      "azure-vpngateway": "VPN Gateway",
+      "azure-firewall": "Azure Firewall",
+      "iaas-public": "IaaS Public",
+      "iaas-outbound": "IaaS Outbound",
+      "iaas-private": "IaaS Private",
+      "AzureBastionSubnet": "Azure Bastion Service"
+    }
+  },
+  "virtualNetGwType": {
+    "category": "Custom",
+    "entity": "virtualNetworkGatewayType",
+    "scope": "global",
+    "maxlength": "12",
+    "rule": "az",
+    "allowed_values": {
+      "expressroute": "Express Route Connection",
+      "vpn": "Virtual Private Network"
+    }
+  }
+}

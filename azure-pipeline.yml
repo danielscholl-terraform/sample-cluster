@@ -1,0 +1,95 @@
+### Trigger Pipeline for all Merges into master.
+trigger:
+  batch: true
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - azure-pipeline.yml
+    - main.tf
+    - terraform.tfvars
+    - /.pipelines/*
+    - /modules/*
+    exclude:
+    - /**/*.md
+
+### Trigger Pipeline for all Pull Requests into master.
+pr:
+  autoCancel: true
+  branches:
+    include:
+    - '*'
+  paths:
+    include:
+    - azure-pipeline.yml
+    - main.tf
+    - terraform.tfvars
+    - /.pipelines/*
+    - /modules/*
+    exclude:
+    - /**/*.md
+
+variables:
+
+###  Version of Terraform to be used in the pipeline.
+- name: 'TF_VERSION'
+  value: '1.1.5'
+
+###  Root Directory of modules and templates are found.
+- name: 'TF_ROOT_DIR'
+  value: '.'
+
+###  Root Directory of where the ADO Pipelines are found for nested templates.
+- name: 'PIPELINE_ROOT_DIR'
+  value: '.pipelines'
+
+### Required Variables in the Group
+###   BUILD_ARTIFACT_NAME
+###   FORCE_RUN
+###   SERVICE_CONNECTION_NAME
+- group: 'sample-cluster-variables'
+
+
+###   ** These are loaded in stage-build.yml and stage-deploy.yml **
+## -------------------------------------------------------------------------------
+### Required Env Group Variables - `{env_name} Environment Variables`
+###    ARM_SUBSCRIPTION_ID
+###    TF_VAR_remote_state_account
+###    TF_VAR_remote_state_container
+###    TF_VAR_location
+stages:
+- template: .pipelines/compose-stages.yml
+  parameters:
+
+## -------------------------------------------------------------------------------
+###   Environments are the list of each environment that the pipeline should create
+###      enablePrIsolation - Create a temporary new environment with the PR number.  Pair this with Configuration - TeardownAfterRelease
+    environments:
+
+## -------------------------------------------------------------------------------
+###   Enable Environments as desired.
+    # - name: 'cicd'
+    #   enablePrIsolation: false
+    - name: 'dev'
+      enablePrIsolation: false
+    - name: 'test'
+      enablePrIsolation: false
+    # - name: 'prod'
+    #   enablePrIsolation: false
+
+
+## -------------------------------------------------------------------------------
+###   Configurations are the list templates that the pipeline should create.
+###      terraformWorkspacePrefix is the prefix used for all resources
+###      terraformTemplatePath is the path of the template to be executed.
+###      deploymentTimeoutInMinutes is length of time before timing out with an error.
+###      environmentsToTeardownAfterRelease is the list of environments to execute tf destroy on.
+    configurations:
+    - jobName: cluster
+      terraformWorkspacePrefix: 'sample-cluster'
+      terraformTemplatePath: '.'
+      terraformModulePath: 'modules'
+      deploymentTimeoutInMinutes: 20
+      environmentsToTeardownAfterRelease:
+      - 'cicd'

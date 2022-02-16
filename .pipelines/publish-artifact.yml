@@ -1,0 +1,44 @@
+jobs:
+- job: Publish
+  displayName: Validate and Publish
+  pool:
+    name: Azure Pipelines
+    vmImage: 'ubuntu-latest'
+
+  workspace:
+    clean: all
+
+  steps:
+  - template: tasks/tf-lint.yml
+  - template: tasks/debug-variables.yml
+    parameters:
+      disable: False
+
+  - task: CopyFiles@2
+    displayName: Copy ADO Files
+    inputs:
+      contents: $(PIPELINE_ROOT_DIR)/**/*
+      sourceFolder: $(Build.SourcesDirectory)
+      targetFolder: $(Build.ArtifactStagingDirectory)
+
+  - task: CopyFiles@2
+    displayName: Copy Modules
+    inputs:
+      contents: modules/**/*
+      sourceFolder: $(Build.SourcesDirectory)
+      targetFolder: $(Build.ArtifactStagingDirectory)
+
+  - task: CopyFiles@2
+    displayName: Copy Templates
+    inputs:
+      contents: main.tf
+      sourceFolder: $(Build.SourcesDirectory)
+      targetFolder: $(Build.ArtifactStagingDirectory)
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Artifact
+    inputs:
+      parallel: true
+      parallelCount: 8
+      artifactName: '$(BUILD_ARTIFACT_NAME)'
+      pathToPublish: $(Build.ArtifactStagingDirectory)

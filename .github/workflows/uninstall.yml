@@ -1,0 +1,52 @@
+name: 'Terraform Uninstall'
+
+on:
+  workflow_dispatch:
+
+env:
+  CLI_VERSION: 2.31.0
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+  TF_VAR_remote_state_account: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+  TF_VAR_remote_state_container: "remote-state-container"
+  TF_VAR_environment: "cicd"
+  TF_WORKSPACE_NAME: "sample-cluster-cicd"
+jobs:
+  destroy:
+    name: Destroy - Solution
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Azure CLI Login
+        uses: azure/CLI@v1
+        with:
+          azcliversion: ${{ env.CLI_VERSION }}
+          inlineScript: |
+            az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config=storage_account_name=${TF_VAR_remote_state_account} -backend-config=container_name=${TF_VAR_remote_state_container}
+        continue-on-error: false
+
+      - name: Terraform Workspace
+        id: workspace
+        run: terraform workspace new $TF_WORKSPACE_NAME || terraform workspace select $TF_WORKSPACE_NAME
+        continue-on-error: false
+
+      - name: Terraform Destroy
+        id: destroy
+        run: terraform destroy -auto-approve
+        continue-on-error: false
+
+      - name: Terraform Workspace Delete
+        id: delete
+        run: terraform workspace select default && terraform workspace delete $TF_WORKSPACE_NAME
+        continue-on-error: false
