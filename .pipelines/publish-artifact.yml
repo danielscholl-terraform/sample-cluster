@@ -35,6 +35,13 @@ jobs:
       sourceFolder: $(Build.SourcesDirectory)
       targetFolder: $(Build.ArtifactStagingDirectory)
 
+  - task: CopyFiles@2
+    displayName: Copy Configuration
+    inputs:
+      contents: setup.conf
+      sourceFolder: $(Build.SourcesDirectory)
+      targetFolder: $(Build.ArtifactStagingDirectory)
+
   - task: PublishBuildArtifacts@1
     displayName: Publish Artifact
     inputs:
