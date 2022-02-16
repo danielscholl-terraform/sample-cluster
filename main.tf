@@ -368,9 +368,6 @@ module "keyvault_secret" {
 # Virtual Machine
 #-------------------------------
 data "local_file" "cloudinit" {
-  gzip          = true
-  base64_encode = true
-
   filename = "${path.module}/setup.conf"
 }
 
@@ -399,7 +396,7 @@ module "linux_server" {
   vnet_subnet_id = module.network.subnets["iaas-private"].id
   ssh_key        = "${trimspace(tls_private_key.key.public_key_openssh)} ${var.admin_username}"
 
-  custom_script = data.local_file.cloudinit.content
+  custom_script = base64encode(data.local_file.cloudinit.content)
 }
 
 
