@@ -368,8 +368,22 @@ module "keyvault_secret" {
 # Virtual Machine
 #-------------------------------
 data "local_file" "cloudinit" {
+  gzip          = true
+  base64_encode = true
+
   filename = "${path.module}/setup.conf"
 }
+
+# data "template_cloudinit_config" "config" {
+#   gzip          = true
+#   base64_encode = true
+
+#   # Main cloud-config configuration file.
+#   part {
+#     content_type = "text/cloud-config"
+#     content      = "packages: ['httpie']"
+#   }
+# }
 
 module "linux_server" {
   source     = "git::https://github.com/danielscholl-terraform/module-virtual-machine?ref=main"
