@@ -34,14 +34,13 @@ In the Azure Portal open the cloud shell `bash` console and execute the followin
 curl https://raw.githubusercontent.com/danielscholl-terraform/sample-cluster/main/main.tf \
   -o main.tf
 
+# Establish a terraform workspace
+export TF_WORKSPACE="sample-cluster-sandbox"
+
 # Initialize and download the required terraform modules
 terraform init \
   -backend-config "storage_account_name=${TF_VAR_remote_state_account}" \
   -backend-config "container_name=${TF_VAR_remote_state_container}" -upgrade
-
-# Establish a terraform workspace
-TF_WORKSPACE="sample-cluster-sandbox"
-terraform workspace new $TF_WORKSPACE || terraform workspace select $TF_WORKSPACE
 
 # Execute a deployment
 terraform apply -var location=southcentralus -var environment=sandbox -var spot_max_count=5 -var spot_vm_size=Standard_D2_v2

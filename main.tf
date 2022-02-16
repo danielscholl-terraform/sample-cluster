@@ -78,11 +78,11 @@ variable "name" {
 }
 
 variable "environment" {
-  description = "The deployment environment (sandbox, dev, prod)."
+  description = "The deployment environment (sandbox, dev, test, prod)."
   type        = string
 
   validation {
-    condition     = (contains(["cicd", "sandbox", "dev", "test", "prod"], var.environment))
+    condition     = (contains(["cicd", "local", "sandbox", "dev", "test", "prod"], var.environment))
     error_message = "The account_tier must be either \"sandbox\" or \"dev\" or \"test\" or \"prod\"."
   }
 }
@@ -107,6 +107,17 @@ variable "spot_vm_size" {
   description = "The default VM size for the Spot Pool"
   type        = string
   default     = "Standard_D2_v2"
+}
+
+variable "admin_username" {
+  description = "The admin username of the VM that will be deployed"
+  default     = "azureuser"
+}
+
+variable "enable_bastion" {
+  description = "Enable the Bastion Host"
+  type        = bool
+  default     = true
 }
 
 #-------------------------------
@@ -216,40 +227,40 @@ module "network" {
   naming_rules        = module.naming.yaml
 
   dns_servers   = ["8.8.8.8"]
-  address_space = ["10.1.0.0/21"]
+  address_space = ["10.1.0.0/16"]
 
   enforce_subnet_names = false
 
   subnets = {
+    GatewaySubnet = { cidrs = ["10.1.0.0/27"]
+      create_network_security_group = false
+    }
+    AzureBastionSubnet = {
+      cidrs               = ["10.1.0.32/27"]
+      configure_nsg_rules = true
+    }
     iaas-public = {
-      cidrs               = ["10.1.0.0/24"]
+      cidrs               = ["10.1.0.64/26"]
       allow_vnet_inbound  = true
       allow_vnet_outbound = true
       service_endpoints   = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
     }
     iaas-private = {
-      cidrs               = ["10.1.1.0/24"]
+      cidrs               = ["10.1.0.128/26"]
       allow_vnet_inbound  = true
       allow_vnet_outbound = true
       service_endpoints   = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
-    }
-    GatewaySubnet = { cidrs = ["10.1.2.0/27"]
-      create_network_security_group = false
-    }
-    AzureBastionSubnet = {
-      cidrs               = ["10.1.2.224/27"]
-      configure_nsg_rules = true
     }
   }
 
   aks_subnets = {
     cluster = {
       private = {
-        cidrs             = ["10.1.4.0/24"]
+        cidrs             = ["10.1.1.0/24"]
         service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
       }
       public = {
-        cidrs             = ["10.1.5.0/24"]
+        cidrs             = ["10.1.128.0/17"]
         service_endpoints = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry"]
       }
       route_table = {
@@ -259,8 +270,8 @@ module "network" {
             address_prefix = "0.0.0.0/0"
             next_hop_type  = "Internet"
           }
-          local-vnet-10-1-0-0-21 = {
-            address_prefix = "10.1.0.0/21"
+          local-vnet-10-1-0-0-16 = {
+            address_prefix = "10.1.0.0/16"
             next_hop_type  = "vnetlocal"
           }
         }
@@ -277,6 +288,8 @@ module "network" {
 module "bastion_host" {
   source     = "git::https://github.com/danielscholl-terraform/module-bastion?ref=v1.0.0"
   depends_on = [module.network]
+
+  count = var.enable_bastion ? 1 : 0
 
   names               = module.metadata.names
   resource_group_name = module.resource_group.name
@@ -305,8 +318,7 @@ module "storage_account" {
   }
 
   service_endpoints = {
-    "cluster-1" = module.network.aks["cluster-1"].subnets.private.id
-    "cluster-2" = module.network.aks["cluster-2"].subnets.private.id
+    "cluster" = module.network.aks["cluster"].subnets.private.id
   }
 }
 
@@ -344,8 +356,7 @@ module "keyvault_secret" {
 
   keyvault_id = module.keyvault.id
   secrets = {
-    "id-rsa" : tls_private_key.key.private_key_pem
-    "id-rsa-pub" : tls_private_key.key.public_key_openssh
+    "ssh-key" : tls_private_key.key.private_key_pem
     "storage-acccount" : module.storage_account.name
     "storage-acccount-key" : module.storage_account.primary_access_key
   }
@@ -356,6 +367,10 @@ module "keyvault_secret" {
 #-------------------------------
 # Virtual Machine
 #-------------------------------
+data "local_file" "cloudinit" {
+  filename = "${path.module}/setup.conf"
+}
+
 module "linux_server" {
   source     = "git::https://github.com/danielscholl-terraform/module-virtual-machine?ref=main"
   depends_on = [module.resource_group, module.network]
@@ -364,27 +379,13 @@ module "linux_server" {
   resource_group_name = module.resource_group.name
   resource_tags       = module.metadata.tags
 
-  vm_os_simple   = "UbuntuServer"
+  vm_os_simple   = "UbuntuServer20"
   vm_instances   = 1
   data_disk      = true
-  vnet_subnet_id = module.network.subnets["iaas-public"].id
-  public_ip_dns  = ["${local.base_name_21}vm"]
-  ssh_key        = "${trimspace(tls_private_key.key.public_key_openssh)} k8sadmin"
-}
+  vnet_subnet_id = module.network.subnets["iaas-private"].id
+  ssh_key        = "${trimspace(tls_private_key.key.public_key_openssh)} ${var.admin_username}"
 
-# Open SSH Port
-resource "azurerm_network_security_rule" "allow_ssh" {
-  name                        = "allow_ssh"
-  priority                    = 100
-  direction                   = "Inbound"
-  access                      = "Allow"
-  protocol                    = "tcp"
-  source_port_range           = "*"
-  destination_port_range      = "22"
-  source_address_prefix       = "Internet"
-  destination_address_prefix  = "VirtualNetwork"
-  resource_group_name         = module.resource_group.name
-  network_security_group_name = module.network.subnet_nsg_names["iaas-public"]
+  custom_script = data.local_file.cloudinit.content
 }
 
 
@@ -503,7 +504,7 @@ module "aad_pod_identity_cluster" {
 #-------------------------------
 module "devito_install" {
   source     = "git::https://github.com/danielscholl-terraform/sample-cluster//modules/devito-install?ref=main"
-  depends_on = [module.registry]
+  depends_on = [module.aks_cluster]
 
   registry = module.registry.name
 }

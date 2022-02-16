@@ -14,6 +14,9 @@ variable "registry" {
 #-------------------------------
 # Devito
 #-------------------------------
+data "azurerm_subscription" "current" {
+}
+
 resource "null_resource" "git_clone" {
   provisioner "local-exec" {
     command = "git clone https://github.com/devitocodes/devito.git"
@@ -47,6 +50,7 @@ resource "null_resource" "build_devito" {
 
   provisioner "local-exec" {
     command = <<EOF
+      az account set --subscription "${data.azurerm_subscription.current.id}"
       az acr build --registry ${var.registry} --file devito/docker/Dockerfile --image devito devito
     EOF
   }
